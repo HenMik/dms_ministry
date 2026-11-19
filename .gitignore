@@ -16,7 +16,6 @@
 /node_modules
 /_legacy/node_modules
 /_legacy/frontend/node_modules
-/public/build
 /public/files/
 /public/fonts-manifest.dev.json
 /public/hot

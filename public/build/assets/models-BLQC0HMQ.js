@@ -1,0 +1,1 @@
+function e(e){return e?e.name??e.full_name??`${e.first_name??``} ${e.last_name??``}`.trim():`—`}export{e as t};

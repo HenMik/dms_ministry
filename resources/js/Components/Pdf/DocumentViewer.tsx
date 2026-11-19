@@ -1206,6 +1206,13 @@ export default function DocumentViewer(props: Props) {
                         }
                     />
                 ) : (
+                <>
+                {!docReady && (
+                    <DocumentLoadView
+                        progress={loadProgress}
+                        phase={loadProgress >= 100 ? 'prepare' : 'download'}
+                    />
+                )}
                 <Document
                     key={workingUrl}
                     file={workingUrl}
@@ -1215,17 +1222,11 @@ export default function DocumentViewer(props: Props) {
                     onLoadError={(err) => setLoadError(err?.message?.includes('Invalid PDF') ? 'This file is not a valid PDF.' : 'The document could not be loaded.')}
                     onPassword={() => setLoadError('This PDF is password-protected and cannot be previewed. Download it to open it locally.')}
                     onItemClick={({ pageNumber }) => goToPage(Number(pageNumber))}
-                    className="relative flex min-h-0 min-w-0 flex-1"
-                    loading={<DocumentLoadView progress={loadProgress} />}
+                    className={cn('relative flex min-h-0 min-w-0 flex-1', !docReady && 'invisible')}
+                    loading={null}
                     error={<ViewerMessage icon={<FileWarning className="h-6 w-6 text-red-500" />} title="The document could not be loaded." />}
                 >
                     <>
-                            {!docReady && (
-                                <DocumentLoadView
-                                    progress={loadProgress}
-                                    phase={loadProgress >= 100 ? 'prepare' : 'download'}
-                                />
-                            )}
                             {showThumbs && numPages > 0 && (
                                 <ThumbnailRail
                                     numPages={numPages}
@@ -1269,11 +1270,7 @@ export default function DocumentViewer(props: Props) {
                             />
                             <div
                                 ref={bindScroll}
-                                className={cn(
-                                    'relative min-w-0 flex-1 overflow-auto scrollbar-thin',
-                                    tool !== 'select' && 'viewer-tool-active',
-                                    !docReady && 'hidden',
-                                )}
+                                className={cn('relative min-w-0 flex-1 overflow-auto scrollbar-thin', tool !== 'select' && 'viewer-tool-active')}
                             >
                                 <div className="mx-auto flex w-max min-w-full flex-col items-center" style={{ padding: `${PAD}px`, gap: `${GAP}px` }}>
                                     {dims.map((d, i) => {
@@ -1476,6 +1473,7 @@ export default function DocumentViewer(props: Props) {
                             </div>
                     </>
                 </Document>
+                </>
                 )}
 
                 {showSaveMarks && (
@@ -1852,43 +1850,64 @@ function PageSkeleton() {
 }
 
 function DocumentLoadView({ progress, phase = 'download' }: { progress: number; phase?: 'download' | 'prepare' }) {
-    const pct = Math.max(0, Math.min(100, progress));
+    const [soft, setSoft] = useState(8);
+    const reported = Math.max(0, Math.min(100, progress));
+    const pct = phase === 'prepare' ? 100 : Math.max(reported, soft);
     const label = phase === 'prepare' ? 'Preparing pages…' : 'Loading document…';
 
+    useEffect(() => {
+        if (phase !== 'download' || reported >= 100) {
+            return;
+        }
+        const id = window.setInterval(() => {
+            setSoft((v) => (v >= 88 ? v : v + (v < 40 ? 4 : v < 70 ? 2 : 1)));
+        }, 280);
+        return () => window.clearInterval(id);
+    }, [phase, reported]);
+
+    useEffect(() => {
+        if (reported > 0) {
+            setSoft((v) => Math.max(v, reported));
+        }
+    }, [reported]);
+
     return (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-start overflow-auto bg-slate-100/80 px-4 py-8 dark:bg-night-950 sm:py-10">
-            <div className="w-full max-w-[min(100%,42rem)]">
-                <div
-                    className="relative mx-auto flex aspect-[210/297] w-full max-h-[min(72vh,52rem)] flex-col overflow-hidden bg-white ring-1 ring-slate-200/90 dark:ring-night-700"
-                    role="status"
-                    aria-live="polite"
-                    aria-label={`${label} ${pct}%`}
-                >
-                    <div className="h-10 shrink-0 border-b border-slate-100 px-7 pt-7">
-                        <div className="h-4 w-[55%] animate-pulse rounded-sm bg-slate-200" />
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-100 px-4 dark:bg-night-950 sm:px-8">
+            <div
+                className="flex w-full max-w-[28rem] flex-col items-center"
+                role="status"
+                aria-live="polite"
+                aria-label={`${label} ${pct}%`}
+            >
+                <div className="flex aspect-[210/297] w-full max-h-[min(68vh,40rem)] flex-col overflow-hidden bg-white ring-1 ring-slate-200 dark:ring-night-700">
+                    <div className="shrink-0 space-y-3 border-b border-slate-100 px-8 pb-5 pt-8">
+                        <div className="h-3.5 w-[58%] animate-pulse rounded-sm bg-slate-200" />
+                        <div className="h-2.5 w-[36%] animate-pulse rounded-sm bg-slate-100" />
                     </div>
-                    <div className="flex flex-1 flex-col gap-3.5 px-7 py-6">
+                    <div className="flex flex-1 flex-col gap-3.5 overflow-hidden px-8 py-6">
                         {SKELETON_LINE_WIDTHS.map((width, i) => (
                             <div
                                 key={i}
-                                className="h-2.5 animate-pulse rounded-sm bg-slate-100"
-                                style={{ width, animationDelay: `${i * 40}ms` }}
+                                className="h-2.5 shrink-0 animate-pulse rounded-sm bg-slate-100"
+                                style={{ width, animationDelay: `${i * 45}ms` }}
                             />
                         ))}
                     </div>
-                    <div className="mt-auto border-t border-slate-100 px-7 py-3">
-                        <div className="h-2 w-20 animate-pulse rounded-sm bg-slate-100" />
+                    <div className="shrink-0 border-t border-slate-100 px-8 py-3">
+                        <div className="h-2 w-16 animate-pulse rounded-sm bg-slate-100" />
                     </div>
                 </div>
 
-                <div className="mx-auto mt-5 w-full max-w-xs">
-                    <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-night-400">
-                        <span>{label}</span>
-                        <span className="tabular-nums text-slate-700 dark:text-night-200">{pct}%</span>
+                <div className="mt-6 w-full max-w-[14rem]">
+                    <div className="mb-2 flex items-baseline justify-between gap-3">
+                        <span className="text-xs font-medium text-slate-500 dark:text-night-400">{label}</span>
+                        <span className="text-sm font-semibold tabular-nums tracking-tight text-slate-800 dark:text-night-100">
+                            {pct}%
+                        </span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-night-800">
                         <div
-                            className="h-full rounded-full bg-brand-600 transition-[width] duration-200 ease-out dark:bg-brand-500"
+                            className="h-full rounded-full bg-brand-600 transition-[width] duration-300 ease-out dark:bg-brand-500"
                             style={{ width: `${pct}%` }}
                         />
                     </div>
