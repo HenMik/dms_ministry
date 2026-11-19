@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        color-scheme: light;
+        --dms-canvas: #f8fafc; /* slate-50 */
+    }
+
+    .dark {
+        color-scheme: dark;
+        --dms-canvas: #151b28; /* night-950 */
+    }
+
+    html {
+        background-color: var(--dms-canvas);
+    }
+
+    body {
+        background-color: var(--dms-canvas);
+        min-height: 100%;
+        letter-spacing: -0.01em;
+    }
+
+    h1,
+    h2,
+    h3 {
+        letter-spacing: -0.025em;
+    }
+
+    #app,
+    [data-page] {
+        min-height: 100%;
+        background-color: var(--dms-canvas);
+    }
+
+    [type='checkbox'] {
+        @apply rounded border-slate-300 text-brand-700 focus:ring-brand-600 dark:border-night-600 dark:bg-night-900;
+    }
+}
+
+@layer components {
+    .table-base {
+        @apply min-w-full divide-y divide-slate-200 text-sm dark:divide-night-800;
+    }
+
+    .table-base thead th {
+        @apply bg-slate-50 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500 dark:bg-night-900 dark:text-night-400;
+    }
+
+    .table-base tbody {
+        @apply divide-y divide-slate-100 bg-white dark:divide-night-800 dark:bg-night-900;
+    }
+
+    .table-base tbody td {
+        @apply px-3 py-2.5 align-middle text-slate-700 dark:text-night-300;
+    }
+
+    .table-base tbody tr {
+        @apply transition-colors hover:bg-slate-50 dark:hover:bg-night-800/50;
+    }
+
+    .prose-minutes {
+        @apply whitespace-pre-wrap text-[15px] leading-7 text-slate-800 dark:text-night-200;
+    }
+}
+
+@layer utilities {
+    .scrollbar-thin {
+        scrollbar-width: thin;
+        scrollbar-color: rgb(148 163 184 / 0.6) transparent;
+    }
+
+    .dark .scrollbar-thin {
+        scrollbar-color: rgb(58 68 85 / 0.9) transparent;
+    }
+}
+
+/* react-pdf text and annotation layers */
+.react-pdf__Page {
+    position: relative;
+}
+
+.react-pdf__Page__textContent {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    line-height: 1;
+    opacity: 1;
+    text-align: initial;
+    transform-origin: 0 0;
+    forced-color-adjust: none;
+    z-index: 2;
+}
+
+.react-pdf__Page__textContent :is(span, br) {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+}
+
+.react-pdf__Page__textContent span::selection {
+    background: rgb(59 130 246 / 0.35);
+}
+
+.react-pdf__Page__annotations {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+}
+
+.react-pdf__Page__annotations .linkAnnotation > a,
+.react-pdf__Page__annotations .buttonWidgetAnnotation.pushButton > a {
+    position: absolute;
+    font-size: 1em;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.react-pdf__Page__annotations .linkAnnotation > a:hover,
+.react-pdf__Page__annotations .buttonWidgetAnnotation.pushButton > a:hover {
+    opacity: 0.2;
+    background: rgb(255 255 0);
+    box-shadow: 0 2px 10px rgb(255 255 0);
+}
+
+.react-pdf__Page__canvas {
+    margin: 0 auto;
+    display: block;
+}
+
+.viewer-tool-active .react-pdf__Page__textContent {
+    pointer-events: none;
+}

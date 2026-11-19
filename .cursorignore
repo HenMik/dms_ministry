@@ -1,0 +1,36 @@
+# Dependencies and build output — keep Cursor index lean
+node_modules/
+vendor/
+public/build/
+public/pdfjs/
+public/files/
+public/hot/
+public/storage/
+
+# Runtime / private storage
+storage/app/private/
+storage/framework/
+storage/logs/
+storage/pail/
+
+# Legacy reference app (not needed for indexing)
+_legacy/
+
+# Mobile deps and builds
+mobile/node_modules/
+mobile/dist/
+mobile/android/app/build/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/**/*.apk
+mobile/**/*.aab
+
+# Archives and DB dumps
+board.zip
+*.zip
+database/dumps/
+*.apk
+*.aab
+
+# Git internals
+.git/
