@@ -27,7 +27,6 @@ import {
     FileWarning,
     Highlighter,
     Italic,
-    Loader2,
     LucideIcon,
     Maximize,
     MessageSquare,
@@ -238,6 +237,8 @@ export default function DocumentViewer(props: Props) {
     const [numPages, setNumPages] = useState(0);
     const [dims, setDims] = useState<Dim[]>([]);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadProgress, setLoadProgress] = useState(0);
+    const [docReady, setDocReady] = useState(false);
     const [zoom, setZoom] = useState(1);
     const [zoomMode, setZoomMode] = useState<ZoomMode>('width');
     const [viewport, setViewport] = useState({ top: 0, height: 800, width: 800 });
@@ -285,6 +286,8 @@ export default function DocumentViewer(props: Props) {
         setNumPages(0);
         setDims([]);
         setLoadError(null);
+        setLoadProgress(0);
+        setDocReady(false);
         setPlacements([]);
         setDraft(null);
         setTool('select');
@@ -333,6 +336,8 @@ export default function DocumentViewer(props: Props) {
         setPageOrder([]);
         setNumPages(0);
         setDims([]);
+        setLoadProgress(0);
+        setDocReady(false);
         setPlacements([]);
         setDraft(null);
     }, []);
@@ -392,6 +397,8 @@ export default function DocumentViewer(props: Props) {
         setPageOrder([]);
         setNumPages(0);
         setDims([]);
+        setLoadProgress(0);
+        setDocReady(false);
         setEditPages(false);
     };
 
@@ -666,10 +673,18 @@ export default function DocumentViewer(props: Props) {
 
     /* ---------- document loading ---------- */
 
+    const onLoadProgress = useCallback(({ loaded, total }: { loaded: number; total: number }) => {
+        if (!total) {
+            return;
+        }
+        setLoadProgress(Math.min(99, Math.round((loaded / total) * 100)));
+    }, []);
+
     const onLoadSuccess = async (pdf: {
         numPages: number;
         getPage: (n: number) => Promise<{ getViewport: (o: { scale: number }) => { width: number; height: number } }>;
     }) => {
+        setLoadProgress(100);
         const sizes: Dim[] = [];
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
@@ -679,6 +694,7 @@ export default function DocumentViewer(props: Props) {
         setDims(sizes);
         setNumPages(pdf.numPages);
         setZoomMode('width');
+        setDocReady(true);
     };
 
     /* ---------- annotations ---------- */
@@ -1195,14 +1211,21 @@ export default function DocumentViewer(props: Props) {
                     file={workingUrl}
                     options={PDF_OPTIONS}
                     onLoadSuccess={onLoadSuccess}
+                    onLoadProgress={onLoadProgress}
                     onLoadError={(err) => setLoadError(err?.message?.includes('Invalid PDF') ? 'This file is not a valid PDF.' : 'The document could not be loaded.')}
                     onPassword={() => setLoadError('This PDF is password-protected and cannot be previewed. Download it to open it locally.')}
                     onItemClick={({ pageNumber }) => goToPage(Number(pageNumber))}
-                    className="flex min-h-0 min-w-0 flex-1"
-                    loading={<ViewerMessage icon={<Loader2 className="h-6 w-6 animate-spin text-brand-600" />} title="Loading document…" />}
+                    className="relative flex min-h-0 min-w-0 flex-1"
+                    loading={<DocumentLoadView progress={loadProgress} />}
                     error={<ViewerMessage icon={<FileWarning className="h-6 w-6 text-red-500" />} title="The document could not be loaded." />}
                 >
                     <>
+                            {!docReady && (
+                                <DocumentLoadView
+                                    progress={loadProgress}
+                                    phase={loadProgress >= 100 ? 'prepare' : 'download'}
+                                />
+                            )}
                             {showThumbs && numPages > 0 && (
                                 <ThumbnailRail
                                     numPages={numPages}
@@ -1246,7 +1269,11 @@ export default function DocumentViewer(props: Props) {
                             />
                             <div
                                 ref={bindScroll}
-                                className={cn('relative min-w-0 flex-1 overflow-auto scrollbar-thin', tool !== 'select' && 'viewer-tool-active')}
+                                className={cn(
+                                    'relative min-w-0 flex-1 overflow-auto scrollbar-thin',
+                                    tool !== 'select' && 'viewer-tool-active',
+                                    !docReady && 'hidden',
+                                )}
                             >
                                 <div className="mx-auto flex w-max min-w-full flex-col items-center" style={{ padding: `${PAD}px`, gap: `${GAP}px` }}>
                                     {dims.map((d, i) => {
@@ -1807,14 +1834,74 @@ function Divider() {
     return <span className="mx-1 hidden h-5 w-px bg-slate-200 dark:bg-night-700 sm:block" />;
 }
 
+const SKELETON_LINE_WIDTHS = ['92%', '78%', '88%', '100%', '100%', '94%', '86%', '100%', '72%', '100%', '90%', '55%', '35%'] as const;
+
 function PageSkeleton() {
-    return <div className="absolute inset-0 animate-pulse bg-gradient-to-b from-white to-slate-50" />;
+    return (
+        <div className="absolute inset-0 flex flex-col bg-white" aria-hidden>
+            <div className="h-8 shrink-0" />
+            <div className="mx-6 h-5 w-3/5 animate-pulse rounded-sm bg-slate-200/90" />
+            <div className="h-6 shrink-0" />
+            <div className="flex flex-1 flex-col gap-3.5 px-6 pb-8">
+                {SKELETON_LINE_WIDTHS.map((width, i) => (
+                    <div key={i} className="h-2.5 animate-pulse rounded-sm bg-slate-100" style={{ width }} />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function DocumentLoadView({ progress, phase = 'download' }: { progress: number; phase?: 'download' | 'prepare' }) {
+    const pct = Math.max(0, Math.min(100, progress));
+    const label = phase === 'prepare' ? 'Preparing pages…' : 'Loading document…';
+
+    return (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-start overflow-auto bg-slate-100/80 px-4 py-8 dark:bg-night-950 sm:py-10">
+            <div className="w-full max-w-[min(100%,42rem)]">
+                <div
+                    className="relative mx-auto flex aspect-[210/297] w-full max-h-[min(72vh,52rem)] flex-col overflow-hidden bg-white ring-1 ring-slate-200/90 dark:ring-night-700"
+                    role="status"
+                    aria-live="polite"
+                    aria-label={`${label} ${pct}%`}
+                >
+                    <div className="h-10 shrink-0 border-b border-slate-100 px-7 pt-7">
+                        <div className="h-4 w-[55%] animate-pulse rounded-sm bg-slate-200" />
+                    </div>
+                    <div className="flex flex-1 flex-col gap-3.5 px-7 py-6">
+                        {SKELETON_LINE_WIDTHS.map((width, i) => (
+                            <div
+                                key={i}
+                                className="h-2.5 animate-pulse rounded-sm bg-slate-100"
+                                style={{ width, animationDelay: `${i * 40}ms` }}
+                            />
+                        ))}
+                    </div>
+                    <div className="mt-auto border-t border-slate-100 px-7 py-3">
+                        <div className="h-2 w-20 animate-pulse rounded-sm bg-slate-100" />
+                    </div>
+                </div>
+
+                <div className="mx-auto mt-5 w-full max-w-xs">
+                    <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-night-400">
+                        <span>{label}</span>
+                        <span className="tabular-nums text-slate-700 dark:text-night-200">{pct}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-night-800">
+                        <div
+                            className="h-full rounded-full bg-brand-600 transition-[width] duration-200 ease-out dark:bg-brand-500"
+                            style={{ width: `${pct}%` }}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function ViewerMessage({ icon, title, action }: { icon: ReactNode; title: string; action?: ReactNode }) {
     return (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white ring-1 ring-slate-200 dark:bg-night-900 dark:ring-night-700">{icon}</div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-md bg-white ring-1 ring-slate-200 dark:bg-night-900 dark:ring-night-700">{icon}</div>
             <p className="max-w-sm text-sm font-medium text-slate-700 dark:text-night-200">{title}</p>
             {action}
         </div>
